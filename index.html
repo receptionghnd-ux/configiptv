@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Xtream - Setup</title>
+    <!-- Chargement de Firebase (Version Compat pour plus de simplicité) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f0c29; background: linear-gradient(to bottom, #0f0c29, #302b63, #24243e); color: white; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .card { background: rgba(255, 255, 255, 0.1); padding: 40px; border-radius: 24px; width: 100%; max-width: 450px; backdrop-filter: blur(15px); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); border: 1px solid rgba(255, 255, 255, 0.1); }
+        h1 { color: #a29bfe; text-align: center; margin-bottom: 10px; font-size: 24px; }
+        p { text-align: center; color: #888; margin-bottom: 30px; }
+        .input-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; color: #ccc; font-size: 14px; }
+        input, select { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.2); color: white; box-sizing: border-box; font-size: 16px; outline: none; }
+        input:focus { border-color: #6c5ce7; }
+        button { width: 100%; padding: 16px; border-radius: 12px; border: none; background: #6c5ce7; color: white; font-weight: bold; font-size: 16px; cursor: pointer; margin-top: 20px; transition: 0.3s; }
+        button:hover { background: #a29bfe; transform: translateY(-2px); }
+        .success { display: none; color: #55efc4; text-align: center; margin-top: 25px; padding: 15px; background: rgba(85, 239, 196, 0.1); border-radius: 10px; }
+        .device-id { color: #6c5ce7; font-weight: bold; background: rgba(108, 92, 231, 0.1); padding: 4px 10px; border-radius: 6px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Configuration à distance</h1>
+        <p>ID Appareil : <span id="display-id" class="device-id">Détection...</span></p>
+        
+        <div class="input-group">
+            <label>Type de connexion</label>
+            <select id="type" onchange="toggleFields()">
+                <option value="XTREAM">Xtream Codes</option>
+                <option value="M3U">Playlist M3U</option>
+                <option value="MAC">Portail MAC</option>
+            </select>
+        </div>
+
+        <!-- Champs Xtream -->
+        <div id="fields-xtream">
+            <div class="input-group"><label>URL Serveur</label><input type="text" id="host" placeholder="http://serveur.com:8080"></div>
+            <div class="input-group"><label>Utilisateur</label><input type="text" id="user"></div>
+            <div class="input-group"><label>Mot de passe</label><input type="password" id="pass"></div>
+        </div>
+
+        <!-- Champs M3U -->
+        <div id="fields-m3u" style="display:none">
+            <div class="input-group"><label>URL de la Playlist (.m3u)</label><input type="text" id="m3u-url" placeholder="http://exemple.com/playlist.m3u"></div>
+        </div>
+
+        <!-- Champs MAC -->
+        <div id="fields-mac" style="display:none">
+            <div class="input-group"><label>URL Portail (Stalker)</label><input type="text" id="mac-host" placeholder="http://mag.exemple.com/c/"></div>
+            <div class="input-group"><label>Adresse MAC</label><input type="text" id="mac-address" placeholder="00:1A:79:XX:XX:XX"></div>
+        </div>
+
+        <button id="btn-send" onclick="sendConfig()">Envoyer à l'appareil</button>
+        <div id="success-msg" class="success">✅ Configuration envoyée ! Votre application va se connecter automatiquement.</div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION FIREBASE (À REMPLACER) ---
+        const firebaseConfig = {
+            apiKey: "VOTRE_API_KEY",
+            authDomain: "votre-projet.firebaseapp.com",
+            projectId: "votre-projet",
+            storageBucket: "votre-projet.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456:web:abcdef"
+        };
+
+        // Initialisation
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        // Récupérer l'ID dans l'URL (ex: ?id=ABC123DEF)
+        const urlParams = new URLSearchParams(window.location.search);
+        const deviceId = urlParams.get('id');
+        if (deviceId) {
+            document.getElementById('display-id').innerText = deviceId;
+        }
+
+        function toggleFields() {
+            const type = document.getElementById('type').value;
+            document.getElementById('fields-xtream').style.display = type === 'XTREAM' ? 'block' : 'none';
+            document.getElementById('fields-m3u').style.display = type === 'M3U' ? 'block' : 'none';
+            document.getElementById('fields-mac').style.display = type === 'MAC' ? 'block' : 'none';
+        }
+
+        async function sendConfig() {
+            if (!deviceId) return alert("Erreur : Aucun ID d'appareil détecté. Scannez le QR Code depuis l'application.");
+            
+            const btn = document.getElementById('btn-send');
+            const type = document.getElementById('type').value;
+            let data = { 
+                type: type, 
+                timestamp: firebase.firestore.FieldValue.serverTimestamp() 
+            };
+
+            // Récupération des données selon le type
+            if (type === 'XTREAM') {
+                data.host = document.getElementById('host').value;
+                data.username = document.getElementById('user').value;
+                data.password = document.getElementById('pass').value;
+            } else if (type === 'M3U') {
+                data.url = document.getElementById('m3u-url').value;
+            } else if (type === 'MAC') {
+                data.host = document.getElementById('mac-host').value;
+                data.mac = document.getElementById('mac-address').value;
+            }
+
+            // Vérification minimale
+            if (!data.host && !data.url) return alert("Veuillez remplir les champs obligatoires.");
+
+            btn.disabled = true;
+            btn.innerText = "Envoi en cours...";
+
+            try {
+                // Envoi vers Firestore dans la collection "remote_configs" avec l'ID de l'appareil
+                await db.collection("remote_configs").doc(deviceId).set(data);
+                document.getElementById('success-msg').style.display = 'block';
+                btn.innerText = "Envoyé !";
+            } catch (error) {
+                console.error(error);
+                alert("Erreur Firebase : " + error.message);
+                btn.disabled = false;
+                btn.innerText = "Réessayer";
+            }
+        }
+    </script>
+</body>
+</html>
